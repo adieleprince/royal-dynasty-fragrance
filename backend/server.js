@@ -16,8 +16,7 @@ const REQUIRED_ENV_VARS = [
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
-    "GMAIL_USER",
-    "GMAIL_APP_PASSWORD"
+    "RESEND_API_KEY"
 ];
 
 const startServer = async () => {
