@@ -15,7 +15,7 @@ const REQUIRED_ENV_VARS = [
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
   "CLOUDINARY_API_SECRET",
-  "RESEND_API_KEY"
+  "BREVO_API_KEY"
 ];
 
 const startServer = async () => {

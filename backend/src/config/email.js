@@ -1,31 +1,66 @@
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const EMAIL_FROM =
-  process.env.EMAIL_FROM ||
-  "Royal Dynasty Fragrance <onboarding@resend.dev>";
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 export const ADMIN_EMAIL =
   process.env.ADMIN_EMAIL || "royaldynastyfragrances@gmail.com";
 
+const EMAIL_FROM = process.env.EMAIL_FROM || ADMIN_EMAIL;
+
+const EMAIL_SENDER_NAME =
+  process.env.EMAIL_SENDER_NAME || "Royal Dynasty Fragrance";
+
+const sendWithBrevo = async ({ to, subject, html }) => {
+  const response = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": process.env.BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: {
+        name: EMAIL_SENDER_NAME,
+        email: EMAIL_FROM
+      },
+      replyTo: {
+        name: EMAIL_SENDER_NAME,
+        email: EMAIL_FROM
+      },
+      to: [
+        {
+          email: to
+        }
+      ],
+      subject,
+      htmlContent: html
+    })
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      result.message || `Brevo email request failed (${response.status})`
+    );
+  }
+
+  return result.messageId;
+};
+
 export const sendEmail = async ({ to, subject, html }) => {
   try {
-    const { data, error } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html
-    });
+    const messageId = await sendWithBrevo({ to, subject, html });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return { success: true, messageId: data.id };
+    return {
+      success: true,
+      messageId
+    };
   } catch (error) {
     console.error(`❌ Failed to send email to ${to}:`, error.message);
-    return { success: false, error: error.message };
+
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
 
@@ -38,21 +73,12 @@ export const sendOrderEmail = async ({
   const results = [];
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    const messageId = await sendWithBrevo({ to, subject, html });
 
     results.push({
       type: "customer",
       success: true,
-      messageId: data.id
+      messageId
     });
 
     console.log(`✅ Customer email sent to: ${to}`);
@@ -67,21 +93,16 @@ export const sendOrderEmail = async ({
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: EMAIL_FROM,
+    const messageId = await sendWithBrevo({
       to: ADMIN_EMAIL,
       subject: adminSubject || `[ADMIN COPY] ${subject}`,
       html
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
     results.push({
       type: "admin",
       success: true,
-      messageId: data.id
+      messageId
     });
 
     console.log(`✅ Admin copy sent to: ${ADMIN_EMAIL}`);
@@ -97,5 +118,3 @@ export const sendOrderEmail = async ({
 
   return results;
 };
-
-export default resend;
