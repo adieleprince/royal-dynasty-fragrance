@@ -185,7 +185,7 @@
   .nav-toggle svg{width:22px;height:22px;}
   .nav-close{display:none;}
 
-  @media (max-width:900px){
+    @media (max-width:1100px){
     .main-nav{position:fixed;inset:0;background:var(--ink);color:#fff;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:1.25rem;transform:translateX(100%);transition:transform .45s var(--ease);z-index:150;}
     .main-nav.open{transform:translateX(0);}
     .nav-toggle{display:inline-flex;}
@@ -193,7 +193,12 @@
     .main-nav .nav-close svg{width:22px;height:22px;}
     .header-actions .btn-primary{display:none;}
   }
-
+  @media (max-width:480px){
+    .container{padding-inline:16px;}
+    .logo{width:42px;height:42px;}
+    .site-header .inner{gap:14px;}
+    .header-actions{gap:10px;}
+  }
   /* ---------- Hero ---------- */
   .hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;background:linear-gradient(160deg,#221c16 0%,#3c3021 45%,#6d4e33 100%);color:#fff;}
   .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 82% 18%,rgba(196,154,108,.38),transparent 58%);}
@@ -224,18 +229,19 @@
   .filter-tabs{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:44px;}
   .filter-tab{padding:9px 18px;border-radius:999px;border:1px solid var(--line);font-size:.84rem;font-weight:500;color:var(--ink-soft);transition:all .3s var(--ease);}
   .filter-tab.active,.filter-tab:hover{background:var(--ink);border-color:var(--ink);color:#fff;}
-  .product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;}
+    .product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;}
   @media (max-width:1000px){.product-grid{grid-template-columns:repeat(3,1fr);}}
   @media (max-width:640px){.product-grid{grid-template-columns:repeat(2,1fr);gap:14px;}}
+  .view-all-wrap{display:none;justify-content:center;margin-top:36px;}
   .product-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .4s var(--ease),transform .4s var(--ease);}
   .product-card.hidden{display:none;}
   .product-card:hover{box-shadow:var(--shadow-card);transform:translateY(-4px);}
-  .product-media{position:relative;background:linear-gradient(160deg,var(--ivory),#fff);padding:26px 0 12px;display:flex;justify-content:center;}
+    .product-media{position:relative;background:linear-gradient(160deg,var(--ivory),#fff);padding:26px 0 12px;display:flex;justify-content:center;overflow:hidden;overflow:hidden;}
   .product-media .bottle-icon{width:76px;height:106px;}
   .product-tag{position:absolute;top:12px;left:12px;background:var(--ink);color:#fff;font-size:.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:999px;}
   .product-tag.new{background:var(--bronze-deep);}
-  .quick-view-btn{position:absolute;bottom:-46px;left:12px;right:12px;background:var(--ink);color:#fff;font-size:.76rem;font-weight:600;padding:10px;border-radius:8px;text-align:center;transition:bottom .35s var(--ease);}
-  .product-media:hover .quick-view-btn,.quick-view-btn:focus-visible{bottom:12px;}
+    .quick-view-btn{position:absolute;bottom:12px;left:12px;right:12px;background:var(--ink);color:#fff;font-size:.76rem;font-weight:600;padding:10px;border-radius:8px;text-align:center;transform:translateY(58px);transition:transform .35s var(--ease);will-change:transform;}
+    .product-media:hover .quick-view-btn,.quick-view-btn:focus-visible{transform:translateY(0);}
   .product-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:7px;flex:1;}
   .product-cat{font-size:.7rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;}
   .product-name{font-size:1.03rem;}
@@ -374,7 +380,8 @@
   .modal-details li::before{content:'';position:absolute;left:0;top:9px;width:6px;height:1px;background:var(--bronze-deep);}
   .modal-qty{display:flex;align-items:center;gap:14px;margin-top:10px;}
   .qty-control{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;}
-  .qty-control button{width:34px;height:34px;font-size:1rem;}
+    .qty-control button{width:34px;height:34px;font-size:1rem;display:flex;align-items:center;justify-content:center;}
+  .qty-control button svg{width:14px;height:14px;}
   .qty-control span{width:26px;text-align:center;font-weight:600;font-size:.9rem;}
   .modal-actions{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}
 
@@ -558,8 +565,11 @@
         <h2>Featured Products</h2>
         <p>The pieces our customers reach for again and again.</p>
       </div>
-      <div class="filter-tabs" id="filterTabs"></div>
+            <div class="filter-tabs" id="filterTabs"></div>
       <div class="product-grid" id="productGrid"></div>
+      <div class="view-all-wrap" id="viewAllWrap">
+        <a href="#" id="viewAllBtn" class="btn btn-outline">View All</a>
+      </div>
     </div>
   </section>
 
@@ -700,7 +710,7 @@
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" aria-label="Close"><svg><use href="#ic-close"/></svg></button>
-    <div class="modal-media"><svg class="bottle-icon" id="modalIcon"><use href="#ic-perfume"/></svg></div>
+        <div class="modal-media" id="modalIcon"><svg class="bottle-icon"><use href="#ic-perfume"/></svg></div>
     <div class="modal-body">
       <span class="product-cat" id="modalCat"></span>
       <h3 id="modalTitle"></h3>
@@ -899,11 +909,33 @@ function renderFilterTabs(){
   });
 }
 
+const PRODUCTS_PER_SECTION = 16;
+
 function setFilter(key){
   document.querySelectorAll('.filter-tab').forEach(b=> b.classList.toggle('active', b.dataset.filter===key));
-  document.querySelectorAll('.product-card').forEach(card=>{
-    card.classList.toggle('hidden', key!=='all' && card.dataset.cat!==key);
+
+  const allCards = [...document.querySelectorAll('.product-card')];
+  const matching = allCards.filter(card => key==='all' || card.dataset.cat===key);
+
+  const viewAllParam = new URLSearchParams(window.location.search).get('viewAll');
+  const isViewAllMode = viewAllParam===key;
+  const cap = (!isViewAllMode && matching.length > PRODUCTS_PER_SECTION) ? PRODUCTS_PER_SECTION : matching.length;
+
+  allCards.forEach(card=>{
+    const idx = matching.indexOf(card);
+    card.classList.toggle('hidden', idx===-1 || idx>=cap);
   });
+
+  const viewAllWrap = document.getElementById('viewAllWrap');
+  const viewAllBtn = document.getElementById('viewAllBtn');
+  if(viewAllWrap && viewAllBtn){
+    if(cap < matching.length){
+      viewAllBtn.href = `royal-dynasty-fragrance.html?viewAll=${encodeURIComponent(key)}#shop`;
+      viewAllWrap.style.display = 'flex';
+    } else {
+      viewAllWrap.style.display = 'none';
+    }
+  }
 }
 
 async function renderProducts() {
@@ -1476,6 +1508,13 @@ document.addEventListener('DOMContentLoaded', async function() {
   observeReveals(document);
   loadCartFromStorage();
   displayCart();
+
+  const viewAllParam = new URLSearchParams(window.location.search).get('viewAll');
+  setFilter(viewAllParam || 'all');
+  if(viewAllParam){
+    document.getElementById('shop').scrollIntoView();
+  }
+
   console.log('Royal Dynasty Fragrance — fully loaded with database products!');
 });
 </script>
