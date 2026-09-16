@@ -161,8 +161,8 @@
   .btn-block{width:100%;}
 
   /* ---------- Header ---------- */
-  .site-header{position:fixed;inset-inline:0;top:0;z-index:100;padding-block:24px;transition:all .4s var(--ease);color:#fff;}
-  .site-header.scrolled{background:rgba(255,255,255,.92);backdrop-filter:blur(14px);box-shadow:0 6px 24px -14px rgba(28,26,23,.25);color:var(--ink);padding-block:14px;}
+    .site-header{position:fixed;inset-inline:0;top:0;z-index:100;padding-block:24px;transition:all .4s var(--ease);color:#fff;background:rgba(20,18,15,.28);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border-bottom:1px solid rgba(255,255,255,.14);box-shadow:0 8px 30px -20px rgba(0,0,0,.35);border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+  .site-header.scrolled{background:rgba(255,253,251,.62);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);box-shadow:0 10px 34px -18px rgba(28,26,23,.3);border-bottom:1px solid rgba(28,26,23,.07);color:var(--ink);padding-block:14px;}
   .site-header .inner{display:flex;align-items:center;justify-content:space-between;gap:24px;}
   .brand{display:flex;align-items:center;gap:12px;}
   .brand .seal{width:36px;height:36px;color:currentColor;flex-shrink:0;}
@@ -183,13 +183,16 @@
   @keyframes bump{0%{transform:scale(1);}40%{transform:scale(1.5);}100%{transform:scale(1);}}
   .nav-toggle{display:none;width:38px;height:38px;align-items:center;justify-content:center;}
   .nav-toggle svg{width:22px;height:22px;}
-  .nav-close{display:none;}
+    .nav-close{display:none;}
+  .nav-overlay{display:none;}
 
-    @media (max-width:1100px){
-    .main-nav{position:fixed;inset:0;background:var(--ink);color:#fff;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:1.25rem;transform:translateX(100%);transition:transform .45s var(--ease);z-index:150;}
-    .main-nav.open{transform:translateX(0);}
+  @media (max-width:900px){
+    .nav-overlay{display:block;position:fixed;inset:0;background:rgba(10,9,7,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .4s var(--ease);z-index:140;}
+    .nav-overlay.open{opacity:1;pointer-events:auto;}
+    .main-nav{position:fixed;top:104px;left:50%;transform:translateX(-50%) scale(.92);width:min(340px,86vw);max-height:calc(100vh - 130px);overflow-y:auto;background:rgba(20,18,15,.55);backdrop-filter:blur(32px) saturate(200%);-webkit-backdrop-filter:blur(32px) saturate(200%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;font-size:1.15rem;padding:52px 30px 36px;border-radius:28px;border:1px solid rgba(255,255,255,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 30px 80px -20px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:transform .4s var(--ease),opacity .35s var(--ease);z-index:150;}
+    .main-nav.open{transform:translateX(-50%) scale(1);opacity:1;pointer-events:auto;}
     .nav-toggle{display:inline-flex;}
-    .main-nav .nav-close{display:inline-flex;position:absolute;top:22px;right:24px;width:38px;height:38px;align-items:center;justify-content:center;}
+    .main-nav .nav-close{display:inline-flex;position:absolute;top:22px;right:24px;width:38px;height:38px;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border-radius:50%;z-index:5;}
     .main-nav .nav-close svg{width:22px;height:22px;}
     .header-actions .btn-primary{display:none;}
   }
@@ -494,6 +497,7 @@
       <span class="brand-text"><strong>Royal Dynasty</strong><span>Fragrance</span></span>
     </a>
 
+    <div class="nav-overlay" id="navOverlay"></div>
     <nav class="main-nav" id="mainNav" aria-label="Primary">
   <button class="nav-close" id="navClose" aria-label="Close menu">
     <svg><use href="#ic-close"/></svg>
@@ -1460,10 +1464,23 @@ window.addEventListener('scroll', ()=>{
 const navToggle = document.getElementById('navToggle');
 const navClose = document.getElementById('navClose');
 const mainNav = document.getElementById('mainNav');
-function openNav(){ mainNav.classList.add('open'); navToggle.setAttribute('aria-expanded','true'); }
-function closeNav(){ mainNav.classList.remove('open'); navToggle.setAttribute('aria-expanded','false'); }
+const navOverlay = document.getElementById('navOverlay');
+function openNav(){
+  mainNav.style.top = (header.offsetHeight + 14) + 'px';
+  mainNav.classList.add('open');
+  if(navOverlay) navOverlay.classList.add('open');
+  navToggle.setAttribute('aria-expanded','true');
+  document.body.style.overflow='hidden';
+}
+function closeNav(){
+  mainNav.classList.remove('open');
+  if(navOverlay) navOverlay.classList.remove('open');
+  navToggle.setAttribute('aria-expanded','false');
+  document.body.style.overflow='';
+}
 navToggle.addEventListener('click', openNav);
 navClose.addEventListener('click', closeNav);
+if(navOverlay) navOverlay.addEventListener('click', closeNav);
 mainNav.querySelectorAll('.nav-link').forEach(a=> a.addEventListener('click', closeNav));
 
 // ============================================================
