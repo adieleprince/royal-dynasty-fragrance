@@ -16,6 +16,21 @@ function makeReference() {
   return `rdf_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// Paystack can be configured so the customer bears Paystack's own
+// transaction fee, in which case the amount actually charged (and
+// returned by verify) is a bit higher than what we sent at initialize.
+// A real payment should never be rejected just because the customer also
+// paid Paystack's fee on top of the order total — only a payment for LESS
+// than the order is an actual problem. We accept anything from the exact
+// expected amount up to a generous 6% ceiling (comfortably covers
+// Paystack's published fee schedules), so a badly wrong order.amount
+// still can't silently wave through an unrelated, much larger payment.
+function paystackAmountCoversOrder(paystackAmountSubunit, expectedSubunit) {
+  if (!Number.isFinite(paystackAmountSubunit) || !Number.isFinite(expectedSubunit)) return false;
+  const maxAcceptable = Math.round(expectedSubunit * 1.06);
+  return paystackAmountSubunit >= expectedSubunit && paystackAmountSubunit <= maxAcceptable;
+}
+
 // =========================================
 // INITIALIZE PAYMENT
 // The cart is validated against our own product/bundle catalog here —
@@ -210,7 +225,7 @@ router.get("/verify/:reference", async (req, res) => {
     // expect for this order, so a tampered request can't slip a lower
     // amount or different currency past us.
     const expectedSubunit = Math.round(order.amount * 100);
-    const amountMatches = paystackSaysSuccess && Number(txn.amount) === expectedSubunit;
+    const amountMatches = paystackSaysSuccess && paystackAmountCoversOrder(Number(txn.amount), expectedSubunit);
     const currencyMatches = paystackSaysSuccess && txn.currency === order.currency;
 
     if (paystackSaysSuccess && amountMatches && currencyMatches) {
@@ -352,7 +367,7 @@ router.post("/admin-verify/:reference", authenticate, requireAdmin, async (req, 
     // Same amount/currency cross-check as the automatic flow — an admin
     // click can never mark an order Paid based on status alone.
     const expectedSubunit = Math.round(order.amount * 100);
-    const amountMatches = paystackSaysSuccess && Number(txn.amount) === expectedSubunit;
+    const amountMatches = paystackSaysSuccess && paystackAmountCoversOrder(Number(txn.amount), expectedSubunit);
     const currencyMatches = paystackSaysSuccess && txn.currency === order.currency;
 
     if (!paystackSaysSuccess || !amountMatches || !currencyMatches) {
