@@ -1594,6 +1594,9 @@ async function renderOrders() {
               <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${o._id}', 'Paid')">Verify</button>
               <button class="btn btn-sm btn-danger" onclick="cancelOrder('${o._id}')">Cancel</button>
             ` : ''}
+            ${(o.paymentMethod === 'Paystack' && (o.status === 'Failed' || o.status === 'Pending Payment') && (o.paymentReference || o.orderId)) ? `
+              <button class="btn btn-sm btn-success" onclick="confirmPaystackPayment('${o.paymentReference || o.orderId}')">Confirm Payment</button>
+            ` : ''}
             ${o.status === 'Paid' ? `
               <button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${o._id}', 'Completed')">Complete</button>
             ` : ''}
@@ -1821,6 +1824,30 @@ async function updateOrderStatus(orderId, newStatus) {
   } catch (error) {
     console.error('STATUS UPDATE ERROR:', error);
     showToast('Could not update order status.', true);
+  }
+}
+
+async function confirmPaystackPayment(reference) {
+  if (!reference) {
+    showToast('This order has no payment reference to verify.', true);
+    return;
+  }
+  if (!confirm(`Verify this payment with Paystack (reference: ${reference})? This will check directly with Paystack before doing anything.`)) return;
+  try {
+    const response = await apiFetch(`${API_BASE}/payments/admin-verify/${encodeURIComponent(reference)}`, {
+      method: 'POST'
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      showToast(data.message || 'Payment could not be verified with Paystack.', true);
+      return;
+    }
+    showToast(data.alreadyProcessed ? 'This order was already marked as paid.' : 'Payment verified with Paystack — order marked Paid and confirmation email sent.');
+    await renderOrders();
+    await renderDashboard();
+  } catch (error) {
+    console.error('CONFIRM PAYSTACK PAYMENT ERROR:', error);
+    showToast('Could not verify this payment. Please try again.', true);
   }
 }
 
