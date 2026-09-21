@@ -5,6 +5,7 @@ import { sendOrderEmail } from "../config/email.js";
 import { orderConfirmationEmail } from "../email-templates/index.js";
 import { isValidEmail, sanitizeText } from "../utils/validation.js";
 import { orderCreationLimiter } from "../middleware/rateLimit.middleware.js";
+import { authenticate, requireAdmin } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -145,6 +146,12 @@ router.post("/initialize", orderCreationLimiter, async (req, res) => {
 // against the order created at initialize time. Safe to call more than
 // once for the same reference: already-finalized orders are returned
 // as-is rather than re-verified or duplicated.
+//
+// This route intentionally does NOT re-check Paystack for an order that's
+// already left "Pending Payment" (including "Failed") — that's what the
+// admin-only /admin-verify route below is for. Keeping this one narrow
+// avoids ever re-triggering a duplicate confirmation email from an
+// ordinary page reload/retry.
 // =========================================
 router.get("/verify/:reference", async (req, res) => {
   try {
@@ -211,7 +218,17 @@ router.get("/verify/:reference", async (req, res) => {
       // only one of them will actually flip the status and send the email.
       const updatedOrder = await Order.findOneAndUpdate(
         { _id: order._id, status: "Pending Payment" },
-        { status: "Paid" },
+        {
+          status: "Paid",
+          paystackVerification: {
+            verifiedAt: new Date(),
+            verifiedBy: "system",
+            transactionId: txn.id,
+            channel: txn.channel,
+            gatewayResponse: txn.gateway_response,
+            paidAt: txn.paid_at
+          }
+        },
         { new: true }
       );
 
@@ -241,7 +258,11 @@ router.get("/verify/:reference", async (req, res) => {
     }
 
     // Payment did not succeed, or didn't match what we expected — mark it
-    // Failed rather than leaving it stuck as pending forever.
+    // Failed rather than leaving it stuck as pending forever. If Paystack
+    // later shows this reference as successful (e.g. a mobile money payment
+    // that settled a few seconds after this check ran), an admin can
+    // recover it with "Confirm Payment" in the dashboard, which calls
+    // /admin-verify below and re-checks Paystack directly.
     order.status = "Failed";
     await order.save();
 
@@ -259,6 +280,139 @@ router.get("/verify/:reference", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Could not verify payment"
+    });
+  }
+});
+
+// =========================================
+// ADMIN: MANUALLY RE-VERIFY A PAYSTACK PAYMENT
+// Recovery path for an order stuck as "Pending Payment" or "Failed" even
+// though Paystack shows the transaction as successful (e.g. the automatic
+// /verify call above ran before Paystack had fully settled the
+// transaction). Unlike /verify, this deliberately DOES re-check orders
+// that already have a terminal status — that's the whole point of a
+// manual recovery path. It still never trusts anything except a fresh,
+// direct Paystack verification call: the admin button can only request a
+// check, it cannot mark an order Paid on its own.
+// =========================================
+router.post("/admin-verify/:reference", authenticate, requireAdmin, async (req, res) => {
+  try {
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: "Payments are not configured on the server."
+      });
+    }
+
+    const { reference } = req.params;
+
+    const order = await Order.findOne({
+      $or: [{ orderId: reference }, { paymentReference: reference }]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "We couldn't find an order for this payment reference."
+      });
+    }
+
+    if (order.status === "Paid" || order.status === "Completed") {
+      return res.status(200).json({
+        success: true,
+        alreadyProcessed: true,
+        message: "This order is already marked as paid.",
+        order
+      });
+    }
+
+    let paystackResponse;
+    try {
+      paystackResponse = await fetch(
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+        }
+      );
+    } catch (networkError) {
+      console.error("PAYSTACK ADMIN-VERIFY NETWORK ERROR:", networkError);
+      return res.status(502).json({
+        success: false,
+        message: "Could not reach Paystack to verify this payment."
+      });
+    }
+
+    const data = await paystackResponse.json();
+    const txn = data?.data;
+
+    const paystackSaysSuccess =
+      paystackResponse.ok && data?.status === true && txn?.status === "success";
+
+    // Same amount/currency cross-check as the automatic flow — an admin
+    // click can never mark an order Paid based on status alone.
+    const expectedSubunit = Math.round(order.amount * 100);
+    const amountMatches = paystackSaysSuccess && Number(txn.amount) === expectedSubunit;
+    const currencyMatches = paystackSaysSuccess && txn.currency === order.currency;
+
+    if (!paystackSaysSuccess || !amountMatches || !currencyMatches) {
+      return res.status(200).json({
+        success: false,
+        message: "Payment could not be verified with Paystack.",
+        order
+      });
+    }
+
+    // Atomic, status-guarded update — protects against double-clicking the
+    // button, or racing with the automatic /verify call, sending a
+    // duplicate confirmation email.
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: order._id, status: { $ne: "Paid" } },
+      {
+        status: "Paid",
+        paymentReference: txn.reference,
+        paystackVerification: {
+          verifiedAt: new Date(),
+          verifiedBy: "admin",
+          transactionId: txn.id,
+          channel: txn.channel,
+          gatewayResponse: txn.gateway_response,
+          paidAt: txn.paid_at
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      const current = await Order.findById(order._id);
+      return res.status(200).json({
+        success: true,
+        alreadyProcessed: true,
+        message: "This order was already marked as paid.",
+        order: current
+      });
+    }
+
+    try {
+      const emailContent = orderConfirmationEmail(updatedOrder);
+      await sendOrderEmail({
+        to: updatedOrder.email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        adminSubject: `[PAYMENT CONFIRMED BY ADMIN] ${emailContent.subject}`
+      });
+    } catch (emailError) {
+      console.error("ADMIN-VERIFY CONFIRMATION EMAIL ERROR:", emailError);
+      // Don't fail the request if the email fails to send — the order is
+      // already correctly marked Paid at this point.
+    }
+
+    return res.status(200).json({ success: true, order: updatedOrder });
+  } catch (error) {
+    console.error("PAYSTACK ADMIN-VERIFY ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not verify this payment. Please try again."
     });
   }
 });

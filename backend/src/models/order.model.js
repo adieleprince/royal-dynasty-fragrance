@@ -54,6 +54,20 @@ const orderSchema = new mongoose.Schema(
         receipt: String,
     receiptPublicId: String,
     receiptOriginalName: String,
+    // Populated once a Paystack transaction has actually been verified
+    // (either by the automatic /verify flow right after checkout, or by an
+    // admin using "Confirm Payment" for an order that got stuck). This is
+    // the real record of what Paystack said — not just our own status flag.
+    paystackVerification: {
+      verifiedAt: Date,
+      // "system" = verified automatically right after checkout,
+      // "admin" = verified manually via the admin dashboard.
+      verifiedBy: String,
+      transactionId: mongoose.Schema.Types.Mixed,
+      channel: String,
+      gatewayResponse: String,
+      paidAt: Date
+    },
     // Consistent status set used across the app:
     //   Pending Payment       — Paystack order created, awaiting checkout completion
     //   Pending Verification  — Ghana receipt submitted, awaiting admin review
